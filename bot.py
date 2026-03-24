@@ -2,6 +2,8 @@ import os
 import logging
 from datetime import datetime
 import pytz
+from fintables_scraper import get_fund_snapshot
+
 
 from telegram import Bot
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -84,6 +86,8 @@ async def cmd_start(update, context: ContextTypes.DEFAULT_TYPE):
         "/rapor — Hemen rapor al\n"
         "/yardim — Bu menü\n\n"
         "Örnek: `/ekle TLY`"
+        "/pozisyon <FON\\_KODU> — Fintables pozisyon verisi\n"
+
     )
     await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -183,6 +187,54 @@ async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Timeout")
     except Exception as e:
         await update.message.reply_text(f"Hata: {e}")
+async def cmd_pozisyon(update, context: ContextTypes.DEFAULT_TYPE):
+    fund_code = context.args[0].upper().strip() if context.args else "TLY"
+
+    try:
+        data = get_fund_snapshot(fund_code)
+
+        lines = [
+            f"📌 *{fund_code}* Fintables Özeti",
+            f"🔗 {data['url']}",
+            "",
+            f"💸 *Nakit Giriş Çıkışı:* {data['nakit_giris_cikisi'] or 'Bulunamadı'}",
+            "",
+            "*En Büyük Pozisyonlar:*"
+        ]
+
+        if data["en_buyuk_pozisyonlar"]:
+            for item in data["en_buyuk_pozisyonlar"][:5]:
+                lines.append(
+                    f"• {item['symbol']} | Ağırlık: %{item['weight_percent']} | Değişim: %{item['change_percent']}"
+                )
+        else:
+            lines.append("• Veri bulunamadı")
+
+        lines.append("")
+        lines.append("*Artırılan Pozisyonlar:*")
+        if data["artirilan_pozisyonlar"]:
+            for item in data["artirilan_pozisyonlar"][:5]:
+                lines.append(
+                    f"• {item['symbol']} | Ağırlık: %{item['weight_percent']} | Değişim: %{item['change_percent']}"
+                )
+        else:
+            lines.append("• Veri bulunamadı")
+
+        lines.append("")
+        lines.append("*Azaltılan Pozisyonlar:*")
+        if data["azaltilan_pozisyonlar"]:
+            for item in data["azaltilan_pozisyonlar"][:5]:
+                lines.append(
+                    f"• {item['symbol']} | Ağırlık: %{item['weight_percent']} | Değişim: %{item['change_percent']}"
+                )
+        else:
+            lines.append("• Veri bulunamadı")
+
+        message = "\n".join(lines)
+        await update.message.reply_text(message[:4000], parse_mode="Markdown")
+
+    except Exception as e:
+        await update.message.reply_text(f"❌ Hata oluştu: {str(e)}")
 
 
 def main():
@@ -201,6 +253,8 @@ def main():
     app.add_handler(CommandHandler("liste", cmd_liste))
     app.add_handler(CommandHandler("rapor", cmd_rapor))
     app.add_handler(CommandHandler("test", cmd_test))
+    app.add_handler(CommandHandler("pozisyon", cmd_pozisyon))
+
 
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     scheduler.add_job(send_daily_report, trigger="cron", hour=REPORT_HOUR, minute=REPORT_MINUTE)
