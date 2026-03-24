@@ -169,26 +169,19 @@ async def cmd_rapor(update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
-    import requests
-    from datetime import datetime
-    date_str = datetime.today().strftime("%d.%m.%Y")
     fund_code = context.args[0].upper() if context.args else "ATA"
-    payload = {
-        "fontip": "YAT",
-        "sfonkod": fund_code,
-        "bastarih": date_str,
-        "bittarih": date_str,
-        "fonturkod": "",
-        "fonkod": fund_code,
-    }
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Referer": "https://www.tefas.gov.tr/FonAnaliz.aspx",
-        "User-Agent": "Mozilla/5.0",
-        "X-Requested-With": "XMLHttpRequest",
-    }
-    resp = requests.post("https://www.tefas.gov.tr/api/DB/BindHistoryInfo", data=payload, headers=headers, timeout=15)
-    await update.message.reply_text(f"Status: {resp.status_code}\n\n{resp.text[:3000]}")
+    try:
+        import borsapy as bp
+        fon = bp.Fund(fund_code)
+        info = fon.info
+        if info is None or info.empty:
+            await update.message.reply_text(f"❌ {fund_code}: info boş döndü")
+            return
+        await update.message.reply_text(
+            f"✅ Kolonlar: {list(info.columns)}\n\nİlk satır:\n{info.iloc[0].to_string()}"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Hata: {e}")
 
 
 def main():
