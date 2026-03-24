@@ -169,13 +169,13 @@ async def cmd_rapor(update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
+    import requests
     fund_code = context.args[0].upper() if context.args else "ATA"
     try:
-        import borsapy as bp
-        fon = bp.Fund(fund_code)
-        info = fon.info
+        url = f"https://www.isyatirim.com.tr/api/fon/getfon?fonkod={fund_code}"
+        resp = requests.get(url, timeout=15)
         await update.message.reply_text(
-            f"✅ Tip: {type(info)}\n\nİçerik:\n{str(info)[:2000]}"
+            f"İş Yatırım\nStatus: {resp.status_code}\n{resp.text[:1000]}"
         )
     except Exception as e:
         await update.message.reply_text(f"❌ Hata: {e}")
