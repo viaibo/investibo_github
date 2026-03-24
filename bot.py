@@ -200,6 +200,7 @@ def main():
     app.add_handler(CommandHandler("cikar", cmd_cikar))
     app.add_handler(CommandHandler("liste", cmd_liste))
     app.add_handler(CommandHandler("rapor", cmd_rapor))
+    app.add_handler(CommandHandler("test", cmd_test))
 
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     scheduler.add_job(send_daily_report, trigger="cron", hour=REPORT_HOUR, minute=REPORT_MINUTE)
