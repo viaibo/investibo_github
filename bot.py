@@ -189,19 +189,17 @@ async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         script = script_block.string
-
-        # Fiyat verisini çek: data:[...] içindeki sayılar
         data_match = re.search(r'"data"\s*:\s*\[([^\]]+)\]', script)
         if data_match:
             prices_raw = data_match.group(1)
             prices = [float(x.strip()) for x in prices_raw.split(",") if x.strip()]
             latest_price = prices[-1]
             prev_price = prices[-2] if len(prices) > 1 else None
+            prev_str = f"₺{prev_price:.4f}" if prev_price else "N/A"
             await update.message.reply_text(
-                f"✅ {fund_code}\nSon fiyat: ₺{latest_price:.4f}\nBir önceki: ₺{prev_price:.4f if prev_price else 'N/A'}\nToplam veri: {len(prices)} gün"
+                f"✅ {fund_code}\nSon fiyat: ₺{latest_price:.4f}\nBir önceki: {prev_str}\nToplam veri: {len(prices)} gün"
             )
         else:
-            # Ham script'i göster
             await update.message.reply_text(f"data bulunamadı, script örneği:\n{script[500:1000]}")
 
     except Exception as e:
