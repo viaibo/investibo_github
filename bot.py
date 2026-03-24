@@ -152,6 +152,32 @@ async def cmd_rapor(update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Rapor hazırlanıyor...")
     await send_daily_report(bot=context.bot)
 
+async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
+    import requests
+    from bs4 import BeautifulSoup
+    fund_code = context.args[0].upper() if context.args else "TLY"
+
+    try:
+        url = f"https://fintables.com/fonlar/{fund_code}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Referer": "https://fintables.com/",
+        }
+        resp = requests.get(url, headers=headers, timeout=15)
+        await update.message.reply_text(f"Status: {resp.status_code}\nBoyut: {len(resp.text)} karakter")
+
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # Tüm sayfadaki metni tara, fiyat ve portföy içeren kısımları bul
+            text = soup.get_text()
+            lines = [l.strip() for l in text.splitlines() if l.strip()]
+            # İlk 50 satırı göster
+            await update.message.reply_text("\n".join(lines[:50]))
+    except Exception as e:
+        await update.message.reply_text(f"Hata: {e}")
+
 
 def main():
     if not TELEGRAM_TOKEN:
