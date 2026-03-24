@@ -169,22 +169,18 @@ async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
         }
         resp = requests.get(url, headers=headers, timeout=20)
         soup = BeautifulSoup(resp.text, "html.parser")
+
+        # Tüm span ve label içeriklerini tara
+        text = soup.get_text(separator="\n")
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
         
-        # Sadece tablo sayısını ve ilk tablonun başlıklarını göster
-        tables = soup.find_all("table")
-        msg = f"Status: {resp.status_code}\nToplam {len(tables)} tablo\n\n"
-        for i, table in enumerate(tables[:6]):
-            rows = table.find_all("tr")
-            msg += f"Tablo {i+1} ({len(rows)} satır): "
-            # Sadece ilk satırı göster
-            if rows:
-                cells = [td.get_text(strip=True) for td in rows[0].find_all(["td","th"])]
-                msg += " | ".join(cells[:4])
-            msg += "\n"
+        # Yatırımcı ve değer içeren satırları bul
+        keywords = ["yatırımcı", "toplam", "büyüklük", "değer", "portföy"]
+        found = [l for l in lines if any(k in l.lower() for k in keywords)]
         
-        await update.message.reply_text(msg[:2000])
-    except requests.exceptions.Timeout:
-        await update.message.reply_text("❌ Timeout")
+        await update.message.reply_text(
+            f"İlgili satırlar ({len(found)} adet):\n\n" + "\n".join(found[:30])
+        )
     except Exception as e:
         await update.message.reply_text(f"Hata: {e}")
 async def cmd_pozisyon(update, context: ContextTypes.DEFAULT_TYPE):
