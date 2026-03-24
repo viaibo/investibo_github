@@ -170,43 +170,27 @@ async def cmd_rapor(update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
     import requests
+    from bs4 import BeautifulSoup
     fund_code = context.args[0].upper() if context.args else "TLY"
 
-    # Deneme 1: borsamatik
     try:
-        url = f"https://www.borsamatik.com.tr/chartdata.php?hisse={fund_code}&period=gunluk"
-        resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        await update.message.reply_text(f"borsamatik\nStatus: {resp.status_code}\n{resp.text[:600]}")
-    except Exception as e:
-        await update.message.reply_text(f"borsamatik hata: {e}")
-
-    # Deneme 2: altin.in fon API
-    try:
-        url = f"https://altin.in/fon/{fund_code}"
-        resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        await update.message.reply_text(f"altin.in\nStatus: {resp.status_code}\n{resp.text[:600]}")
-    except Exception as e:
-        await update.message.reply_text(f"altin.in hata: {e}")
-
-    # Deneme 3: turkishexporter - tefas mirror
-    try:
-        from datetime import datetime
-        date_str = datetime.today().strftime("%d.%m.%Y")
-        url = "https://www.tefas.gov.tr/api/DB/BindHistoryInfo"
-        payload = {"fontip": "YAT", "sfonkod": fund_code, "bastarih": date_str, "bittarih": date_str, "fonturkod": ""}
+        url = f"https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod={fund_code}"
         headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": "https://www.tefas.gov.tr/FonAnaliz.aspx",
-            "X-Requested-With": "XMLHttpRequest",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Origin": "https://www.tefas.gov.tr",
-            "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "tr-TR,tr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
-        resp = requests.post(url, data=payload, headers=headers, timeout=15)
-        await update.message.reply_text(f"tefas (tam header)\nStatus: {resp.status_code}\n{resp.text[:600]}")
+        resp = requests.get(url, headers=headers, timeout=15)
+        await update.message.reply_text(f"Status: {resp.status_code}\nBoyut: {len(resp.text)} karakter")
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        script_block = soup.find("script", string=lambda t: t and "FonFiyatGrafik" in t)
+        if script_block:
+            await update.message.reply_text(f"✅ Script bloğu bulundu!\n\n{script_block.string[:500]}")
+        else:
+            await update.message.reply_text("❌ Script bloğu bulunamadı — sayfa muhtemelen JS ile render ediliyor.")
     except Exception as e:
-        await update.message.reply_text(f"tefas hata: {e}")
+        await update.message.reply_text(f"Hata: {e}")
 
 
 def main():
