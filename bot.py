@@ -2,8 +2,6 @@ import os
 import logging
 from datetime import datetime
 import pytz
-from fintables_scraper import get_fund_snapshot
-
 
 from telegram import Bot
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -61,9 +59,16 @@ async def send_daily_report(bot: Bot = None):
                 change_str = "⚪ Veri yok"
                 prev_str = f"Bugün: ₺{price:.4f}"
 
-            lines.append(f"\n*{code}* — {title[:35]}")
+            lines.append(f"\n*{code}* — {title[:40]}")
             lines.append(f"  {change_str}")
             lines.append(f"  {prev_str}")
+
+            if data.get("total_value"):
+                lines.append(f"  💼 Fon Büyüklüğü: ₺{data['total_value']}")
+            if data.get("investor_count"):
+                lines.append(f"  👥 Yatırımcı: {data['investor_count']} kişi")
+            if data.get("risk_value"):
+                lines.append(f"  ⚠️ Risk: {data['risk_value']}/7")
 
         except Exception as e:
             logger.error(f"Hata ({code}): {e}")
@@ -86,8 +91,6 @@ async def cmd_start(update, context: ContextTypes.DEFAULT_TYPE):
         "/rapor — Hemen rapor al\n"
         "/yardim — Bu menü\n\n"
         "Örnek: `/ekle TLY`"
-        "/pozisyon <FON\\_KODU> — Fintables pozisyon verisi\n"
-
     )
     await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -156,86 +159,6 @@ async def cmd_rapor(update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Rapor hazırlanıyor...")
     await send_daily_report(bot=context.bot)
 
-async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
-    import requests
-    from bs4 import BeautifulSoup
-    fund_code = context.args[0].upper() if context.args else "TLY"
-
-    try:
-        url = f"https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod={fund_code}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-        }
-        resp = requests.get(url, headers=headers, timeout=20)
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        msg = ""
-        for keyword in ["Fon Toplam Değer", "Yatırımcı Sayısı", "Fonun Risk Değeri"]:
-            tag = soup.find(string=lambda t: t and keyword in t)
-            if tag:
-                parent = tag.parent
-                # Etrafındaki birkaç elementi göster
-                msg += f"\n--- {keyword} ---\n"
-                msg += f"Tag: {parent}\n"
-                # Sonraki kardeş elementleri göster
-                for sib in parent.find_next_siblings()[:3]:
-                    msg += f"Sibling: {sib}\n"
-
-        await update.message.reply_text(msg[:3000] if msg else "Bulunamadı")
-    except Exception as e:
-        await update.message.reply_text(f"Hata: {e}")
-        
-async def cmd_pozisyon(update, context: ContextTypes.DEFAULT_TYPE):
-    fund_code = context.args[0].upper().strip() if context.args else "TLY"
-
-    try:
-        data = await get_fund_snapshot(fund_code)
-
-
-        lines = [
-            f"📌 *{fund_code}* Fintables Özeti",
-            f"🔗 {data['url']}",
-            "",
-            f"💸 *Nakit Giriş Çıkışı:* {data['nakit_giris_cikisi'] or 'Bulunamadı'}",
-            "",
-            "*En Büyük Pozisyonlar:*"
-        ]
-
-        if data["en_buyuk_pozisyonlar"]:
-            for item in data["en_buyuk_pozisyonlar"][:5]:
-                lines.append(
-                    f"• {item['symbol']} | Ağırlık: %{item['weight_percent']} | Değişim: %{item['change_percent']}"
-                )
-        else:
-            lines.append("• Veri bulunamadı")
-
-        lines.append("")
-        lines.append("*Artırılan Pozisyonlar:*")
-        if data["artirilan_pozisyonlar"]:
-            for item in data["artirilan_pozisyonlar"][:5]:
-                lines.append(
-                    f"• {item['symbol']} | Ağırlık: %{item['weight_percent']} | Değişim: %{item['change_percent']}"
-                )
-        else:
-            lines.append("• Veri bulunamadı")
-
-        lines.append("")
-        lines.append("*Azaltılan Pozisyonlar:*")
-        if data["azaltilan_pozisyonlar"]:
-            for item in data["azaltilan_pozisyonlar"][:5]:
-                lines.append(
-                    f"• {item['symbol']} | Ağırlık: %{item['weight_percent']} | Değişim: %{item['change_percent']}"
-                )
-        else:
-            lines.append("• Veri bulunamadı")
-
-        message = "\n".join(lines)
-        await update.message.reply_text(message[:4000], parse_mode="Markdown")
-
-    except Exception as e:
-        await update.message.reply_text(f"❌ Hata oluştu: {str(e)}")
-
 
 def main():
     if not TELEGRAM_TOKEN:
@@ -252,9 +175,6 @@ def main():
     app.add_handler(CommandHandler("cikar", cmd_cikar))
     app.add_handler(CommandHandler("liste", cmd_liste))
     app.add_handler(CommandHandler("rapor", cmd_rapor))
-    app.add_handler(CommandHandler("test", cmd_test))
-    app.add_handler(CommandHandler("pozisyon", cmd_pozisyon))
-
 
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     scheduler.add_job(send_daily_report, trigger="cron", hour=REPORT_HOUR, minute=REPORT_MINUTE)
