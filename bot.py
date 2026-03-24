@@ -170,6 +170,7 @@ async def cmd_rapor(update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
     import requests
+    import re
     from bs4 import BeautifulSoup
     fund_code = context.args[0].upper() if context.args else "TLY"
 
@@ -178,17 +179,31 @@ async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept-Language": "tr-TR,tr;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
         resp = requests.get(url, headers=headers, timeout=15)
-        await update.message.reply_text(f"Status: {resp.status_code}\nBoyut: {len(resp.text)} karakter")
-
         soup = BeautifulSoup(resp.text, "html.parser")
         script_block = soup.find("script", string=lambda t: t and "FonFiyatGrafik" in t)
-        if script_block:
-            await update.message.reply_text(f"✅ Script bloğu bulundu!\n\n{script_block.string[:500]}")
+
+        if not script_block:
+            await update.message.reply_text("❌ Script bloğu bulunamadı.")
+            return
+
+        script = script_block.string
+
+        # Fiyat verisini çek: data:[...] içindeki sayılar
+        data_match = re.search(r'"data"\s*:\s*\[([^\]]+)\]', script)
+        if data_match:
+            prices_raw = data_match.group(1)
+            prices = [float(x.strip()) for x in prices_raw.split(",") if x.strip()]
+            latest_price = prices[-1]
+            prev_price = prices[-2] if len(prices) > 1 else None
+            await update.message.reply_text(
+                f"✅ {fund_code}\nSon fiyat: ₺{latest_price:.4f}\nBir önceki: ₺{prev_price:.4f if prev_price else 'N/A'}\nToplam veri: {len(prices)} gün"
+            )
         else:
-            await update.message.reply_text("❌ Script bloğu bulunamadı — sayfa muhtemelen JS ile render ediliyor.")
+            # Ham script'i göster
+            await update.message.reply_text(f"data bulunamadı, script örneği:\n{script[500:1000]}")
+
     except Exception as e:
         await update.message.reply_text(f"Hata: {e}")
 
