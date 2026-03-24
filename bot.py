@@ -170,19 +170,22 @@ async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
         resp = requests.get(url, headers=headers, timeout=20)
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Tüm span ve label içeriklerini tara
-        text = soup.get_text(separator="\n")
-        lines = [l.strip() for l in text.splitlines() if l.strip()]
-        
-        # Yatırımcı ve değer içeren satırları bul
-        keywords = ["yatırımcı", "toplam", "büyüklük", "değer", "portföy"]
-        found = [l for l in lines if any(k in l.lower() for k in keywords)]
-        
-        await update.message.reply_text(
-            f"İlgili satırlar ({len(found)} adet):\n\n" + "\n".join(found[:30])
-        )
+        msg = ""
+        for keyword in ["Fon Toplam Değer", "Yatırımcı Sayısı", "Fonun Risk Değeri"]:
+            tag = soup.find(string=lambda t: t and keyword in t)
+            if tag:
+                parent = tag.parent
+                # Etrafındaki birkaç elementi göster
+                msg += f"\n--- {keyword} ---\n"
+                msg += f"Tag: {parent}\n"
+                # Sonraki kardeş elementleri göster
+                for sib in parent.find_next_siblings()[:3]:
+                    msg += f"Sibling: {sib}\n"
+
+        await update.message.reply_text(msg[:3000] if msg else "Bulunamadı")
     except Exception as e:
         await update.message.reply_text(f"Hata: {e}")
+        
 async def cmd_pozisyon(update, context: ContextTypes.DEFAULT_TYPE):
     fund_code = context.args[0].upper().strip() if context.args else "TLY"
 
