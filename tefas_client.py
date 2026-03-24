@@ -1,6 +1,5 @@
 """
 TEFAS üzerinden fon verisi çeken modül.
-Resmi TEFAS API kullanır: https://www.tefas.gov.tr/api/DB/BindHistoryInfo
 """
 
 import requests
@@ -19,35 +18,21 @@ TEFAS_HEADERS = {
 
 
 def get_fund_data(fund_code: str) -> dict | None:
-    """
-    TEFAS'tan belirtilen fon kodunun güncel verisini çeker.
-    
-    Returns:
-        {
-            "code": "ATA",
-            "title": "Fon Adı",
-            "price": 1.234567,
-            "date": "2024-01-15",
-            "number_of_shares": 12345678.0,
-            "number_of_investors": 1234
-        }
-        ya da None (hata durumunda)
-    """
     today = datetime.today()
-    # Hafta sonu ve tatil günlerinde son iş gününü dene (3 gün geriye git)
     for days_back in range(0, 5):
         target_date = today - timedelta(days=days_back)
         date_str = target_date.strftime("%d.%m.%Y")
-        
+
         try:
             payload = {
                 "fontip": "YAT",
-                "sfonkod": fund_code,
+                "sfonkod": fund_code.upper(),
                 "bastarih": date_str,
                 "bittarih": date_str,
                 "fonturkod": "",
+                "fonkod": fund_code.upper(),
             }
-            
+
             resp = requests.post(
                 TEFAS_API_URL,
                 data=payload,
@@ -56,51 +41,50 @@ def get_fund_data(fund_code: str) -> dict | None:
             )
             resp.raise_for_status()
             data = resp.json()
-            
+
             records = data.get("data", [])
             if not records:
-                continue  # Bu tarihte veri yok, bir önceki güne git
-            
-            rec = records[0]
-            price = float(rec.get("FIYAT", 0))
-            if price == 0:
                 continue
-            
-            return {
-                "code": fund_code,
-                "title": rec.get("FONUNVAN", fund_code),
-                "price": price,
-                "date": rec.get("TARIH", date_str),
-                "number_of_shares": float(rec.get("TEDPAYSAYISI", 0)),
-                "number_of_investors": int(rec.get("KISISAYISI", 0)),
-            }
-        
+
+            # Dönen kayıtlar içinde doğru fon kodunu bul
+            for rec in records:
+                if rec.get("FONKODU", "").upper() == fund_code.upper():
+                    price = float(rec.get("FIYAT", 0))
+                    if price == 0:
+                        continue
+                    return {
+                        "code": fund_code.upper(),
+                        "title": rec.get("FONUNVAN", fund_code),
+                        "price": price,
+                        "date": rec.get("TARIH", date_str),
+                        "number_of_shares": float(rec.get("TEDPAYSAYISI", 0)),
+                        "number_of_investors": int(rec.get("KISISAYISI", 0)),
+                    }
+
         except requests.exceptions.RequestException as e:
             logger.error(f"TEFAS isteği başarısız ({fund_code}): {e}")
             return None
         except (KeyError, ValueError, TypeError) as e:
             logger.error(f"TEFAS veri ayrıştırma hatası ({fund_code}): {e}")
             return None
-    
+
     logger.warning(f"{fund_code} için son 5 günde veri bulunamadı.")
     return None
 
 
 def get_fund_history(fund_code: str, days: int = 30) -> list[dict]:
-    """
-    Belirtilen fon için geçmiş fiyat verilerini çeker.
-    """
     today = datetime.today()
     start = today - timedelta(days=days)
-    
+
     payload = {
         "fontip": "YAT",
-        "sfonkod": fund_code,
+        "sfonkod": fund_code.upper(),
         "bastarih": start.strftime("%d.%m.%Y"),
         "bittarih": today.strftime("%d.%m.%Y"),
         "fonturkod": "",
+        "fonkod": fund_code.upper(),
     }
-    
+
     try:
         resp = requests.post(
             TEFAS_API_URL,
@@ -111,15 +95,16 @@ def get_fund_history(fund_code: str, days: int = 30) -> list[dict]:
         resp.raise_for_status()
         data = resp.json()
         records = data.get("data", [])
-        
+
         result = []
         for rec in records:
-            result.append({
-                "date": rec.get("TARIH"),
-                "price": float(rec.get("FIYAT", 0)),
-            })
+            if rec.get("FONKODU", "").upper() == fund_code.upper():
+                result.append({
+                    "date": rec.get("TARIH"),
+                    "price": float(rec.get("FIYAT", 0)),
+                })
         return result
-    
+
     except Exception as e:
         logger.error(f"Geçmiş veri alınamadı ({fund_code}): {e}")
         return []
