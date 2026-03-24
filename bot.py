@@ -176,6 +176,27 @@ async def cmd_rapor(update, context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
     await send_daily_report(bot=bot)
 
+async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
+    import requests
+    from datetime import datetime
+    date_str = datetime.today().strftime("%d.%m.%Y")
+    fund_code = context.args[0].upper() if context.args else "ATA"
+    payload = {
+        "fontip": "YAT",
+        "sfonkod": fund_code,
+        "bastarih": date_str,
+        "bittarih": date_str,
+        "fonturkod": "",
+        "fonkod": fund_code,
+    }
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Referer": "https://www.tefas.gov.tr/FonAnaliz.aspx",
+        "User-Agent": "Mozilla/5.0",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    resp = requests.post("https://www.tefas.gov.tr/api/DB/BindHistoryInfo", data=payload, headers=headers, timeout=15)
+    await update.message.reply_text(f"Status: {resp.status_code}\n\n{resp.text[:3000]}")
 
 def main():
     if not TELEGRAM_TOKEN:
@@ -191,7 +212,8 @@ def main():
     app.add_handler(CommandHandler("cikar", cmd_cikar))
     app.add_handler(CommandHandler("liste", cmd_liste))
     app.add_handler(CommandHandler("rapor", cmd_rapor))
-
+    app.add_handler(CommandHandler("test", cmd_test))
+    
     # Zamanlayıcı — her gün REPORT_HOUR:REPORT_MINUTE'te rapor gönder
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     scheduler.add_job(
