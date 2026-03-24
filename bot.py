@@ -171,14 +171,30 @@ async def cmd_rapor(update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
     import requests
     fund_code = context.args[0].upper() if context.args else "TLY"
+    
+    # Deneme 1: fonbul.com
     try:
-        url = f"https://www.isyatirim.com.tr/api/fon/getfon?fonkod={fund_code}"
+        url = f"https://fonbul.com/api/fund/{fund_code}"
         resp = requests.get(url, timeout=15)
-        await update.message.reply_text(
-            f"İş Yatırım\nStatus: {resp.status_code}\n{resp.text[:1000]}"
-        )
+        await update.message.reply_text(f"fonbul.com\nStatus: {resp.status_code}\n{resp.text[:500]}")
     except Exception as e:
-        await update.message.reply_text(f"❌ Hata: {e}")
+        await update.message.reply_text(f"fonbul.com hata: {e}")
+
+    # Deneme 2: collectapi
+    try:
+        url = f"https://api.collectapi.com/economy/fundAll"
+        resp = requests.get(url, timeout=15)
+        await update.message.reply_text(f"collectapi\nStatus: {resp.status_code}\n{resp.text[:500]}")
+    except Exception as e:
+        await update.message.reply_text(f"collectapi hata: {e}")
+
+    # Deneme 3: bigpara
+    try:
+        url = f"https://bigpara.hurriyet.com.tr/api/v1/fund/detail/{fund_code}"
+        resp = requests.get(url, timeout=15)
+        await update.message.reply_text(f"bigpara\nStatus: {resp.status_code}\n{resp.text[:500]}")
+    except Exception as e:
+        await update.message.reply_text(f"bigpara hata: {e}")
 
 
 def main():
