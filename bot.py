@@ -191,7 +191,8 @@ async def cmd_pozisyon(update, context: ContextTypes.DEFAULT_TYPE):
     fund_code = context.args[0].upper().strip() if context.args else "TLY"
 
     try:
-        data = get_fund_snapshot(fund_code)
+        data = await get_fund_snapshot(fund_code)
+
 
         lines = [
             f"📌 *{fund_code}* Fintables Özeti",
