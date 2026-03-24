@@ -174,11 +174,8 @@ async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
         import borsapy as bp
         fon = bp.Fund(fund_code)
         info = fon.info
-        if info is None or info.empty:
-            await update.message.reply_text(f"❌ {fund_code}: info boş döndü")
-            return
         await update.message.reply_text(
-            f"✅ Kolonlar: {list(info.columns)}\n\nİlk satır:\n{info.iloc[0].to_string()}"
+            f"✅ Tip: {type(info)}\n\nİçerik:\n{str(info)[:2000]}"
         )
     except Exception as e:
         await update.message.reply_text(f"❌ Hata: {e}")
