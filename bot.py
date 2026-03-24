@@ -172,30 +172,41 @@ async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
     import requests
     fund_code = context.args[0].upper() if context.args else "TLY"
 
-    # Deneme 1: mynet farklı URL
+    # Deneme 1: borsamatik
     try:
-        url = f"https://finans.mynet.com/fon/detay/{fund_code.lower()}/"
+        url = f"https://www.borsamatik.com.tr/chartdata.php?hisse={fund_code}&period=gunluk"
         resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        # fiyat içeriyor mu?
-        if "fiyat" in resp.text.lower() or "price" in resp.text.lower():
-            idx = resp.text.lower().find("fiyat")
-            await update.message.reply_text(f"mynet ✅\nStatus: {resp.status_code}\n...{resp.text[max(0,idx-50):idx+200]}...")
-        else:
-            await update.message.reply_text(f"mynet - fiyat bulunamadı\nStatus: {resp.status_code}\nURL: {resp.url}")
+        await update.message.reply_text(f"borsamatik\nStatus: {resp.status_code}\n{resp.text[:600]}")
     except Exception as e:
-        await update.message.reply_text(f"mynet hata: {e}")
+        await update.message.reply_text(f"borsamatik hata: {e}")
 
-    # Deneme 2: doviz.com
+    # Deneme 2: altin.in fon API
     try:
-        url = f"https://www.doviz.com/yatirim-fonlari/{fund_code}"
+        url = f"https://altin.in/fon/{fund_code}"
         resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        if "fiyat" in resp.text.lower() or fund_code in resp.text:
-            idx = max(resp.text.lower().find("fiyat"), 0)
-            await update.message.reply_text(f"doviz.com ✅\nStatus: {resp.status_code}\n...{resp.text[idx:idx+300]}...")
-        else:
-            await update.message.reply_text(f"doviz.com - veri yok\nStatus: {resp.status_code}\nURL: {resp.url}")
+        await update.message.reply_text(f"altin.in\nStatus: {resp.status_code}\n{resp.text[:600]}")
     except Exception as e:
-        await update.message.reply_text(f"doviz.com hata: {e}")
+        await update.message.reply_text(f"altin.in hata: {e}")
+
+    # Deneme 3: turkishexporter - tefas mirror
+    try:
+        from datetime import datetime
+        date_str = datetime.today().strftime("%d.%m.%Y")
+        url = "https://www.tefas.gov.tr/api/DB/BindHistoryInfo"
+        payload = {"fontip": "YAT", "sfonkod": fund_code, "bastarih": date_str, "bittarih": date_str, "fonturkod": ""}
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": "https://www.tefas.gov.tr/FonAnaliz.aspx",
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Origin": "https://www.tefas.gov.tr",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+        }
+        resp = requests.post(url, data=payload, headers=headers, timeout=15)
+        await update.message.reply_text(f"tefas (tam header)\nStatus: {resp.status_code}\n{resp.text[:600]}")
+    except Exception as e:
+        await update.message.reply_text(f"tefas hata: {e}")
 
 
 def main():
