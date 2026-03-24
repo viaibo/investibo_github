@@ -1,5 +1,5 @@
 """
-TEFAS FonAnaliz sayfasından Highcharts script bloğunu parse ederek fon verisi çeker.
+TEFAS FonAnaliz sayfasından fon verisi çeker.
 """
 
 import re
@@ -17,29 +17,26 @@ HEADERS = {
 }
 
 
-def _fetch_script(fund_code: str) -> str | None:
+def _fetch_page(fund_code: str):
     url = f"https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod={fund_code}"
     try:
         resp = requests.get(url, headers=HEADERS, timeout=20)
         resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        script_block = soup.find("script", string=lambda t: t and "FonFiyatGrafik" in t)
-        if script_block:
-            return script_block.string
-        logger.warning(f"{fund_code}: FonFiyatGrafik script bloğu bulunamadı.")
-        return None
+        return BeautifulSoup(resp.text, "html.parser")
     except Exception as e:
         logger.error(f"{fund_code}: Sayfa alınamadı: {e}")
         return None
 
 
-def _parse_prices(script: str) -> list[float]:
-    data_match = re.search(r'"data"\s*:\s*\[([^\]]+)\]', script)
+def _parse_prices(soup: BeautifulSoup) -> list[float]:
+    script_block = soup.find("script", string=lambda t: t and "FonFiyatGrafik" in t)
+    if not script_block:
+        return []
+    data_match = re.search(r'"data"\s*:\s*\[([^\]]+)\]', script_block.string)
     if not data_match:
         return []
-    prices_raw = data_match.group(1)
     prices = []
-    for x in prices_raw.split(","):
+    for x in data_match.group(1).split(","):
         x = x.strip()
         if x:
             try:
@@ -49,27 +46,43 @@ def _parse_prices(script: str) -> list[float]:
     return prices
 
 
-def _parse_title(script: str, fund_code: str) -> str:
-    # Fon adını subtitle veya başka bir alandan çekmeye çalış
-    match = re.search(r'"subtitle"\s*:\s*\{[^}]*"text"\s*:\s*"([^"]+)"', script)
-    if match:
-        return match.group(1)
-    return fund_code
+def _parse_li_value(soup: BeautifulSoup, keyword: str) -> str | None:
+    tag = soup.find(string=lambda t: t and keyword in t)
+    if not tag:
+        return None
+    span = tag.parent.find("span")
+    if span:
+        return span.get_text(strip=True)
+    return None
 
 
 def get_fund_data(fund_code: str) -> dict | None:
-    script = _fetch_script(fund_code)
-    if not script:
+    soup = _fetch_page(fund_code)
+    if not soup:
         return None
 
-    prices = _parse_prices(script)
+    prices = _parse_prices(soup)
     if not prices:
         logger.warning(f"{fund_code}: Fiyat verisi parse edilemedi.")
         return None
 
     latest_price = prices[-1]
     prev_price = prices[-2] if len(prices) > 1 else None
-    title = _parse_title(script, fund_code)
+
+    # Fon adı
+    title_tag = soup.find("span", {"id": lambda x: x and "FonUnvan" in x}) or \
+                soup.find("h3", class_=lambda x: x and "fon" in str(x).lower())
+    title = title_tag.get_text(strip=True) if title_tag else fund_code
+
+    # Ek veriler
+    total_value = _parse_li_value(soup, "Fon Toplam Değer")
+    investor_count = _parse_li_value(soup, "Yatırımcı Sayısı")
+    risk_value = None
+    risk_td = soup.find("td", class_="fund-profile-header", string=lambda t: t and "Risk" in str(t))
+    if risk_td:
+        next_td = risk_td.find_next_sibling("td")
+        if next_td:
+            risk_value = next_td.get_text(strip=True)
 
     return {
         "code": fund_code.upper(),
@@ -77,17 +90,15 @@ def get_fund_data(fund_code: str) -> dict | None:
         "price": latest_price,
         "prev_price": prev_price,
         "date": datetime.today().strftime("%d.%m.%Y"),
+        "total_value": total_value,
+        "investor_count": investor_count,
+        "risk_value": risk_value,
     }
 
 
 def get_fund_history(fund_code: str, days: int = 30) -> list[dict]:
-    script = _fetch_script(fund_code)
-    if not script:
+    soup = _fetch_page(fund_code)
+    if not soup:
         return []
-
-    prices = _parse_prices(script)
-    if not prices:
-        return []
-
-    # Son `days` günü döndür
+    prices = _parse_prices(soup)
     return [{"price": p} for p in prices[-days:]]
