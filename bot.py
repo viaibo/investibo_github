@@ -154,19 +154,30 @@ async def cmd_rapor(update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
     import requests
+    from bs4 import BeautifulSoup
     fund_code = context.args[0].upper() if context.args else "TLY"
 
     try:
-        url = f"https://fintables.com/fonlar/{fund_code}"
+        url = f"https://www.tefas.gov.tr/FonPortfoyDetay.aspx?FonKod={fund_code}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept-Language": "tr-TR,tr;q=0.9",
         }
-        resp = requests.get(url, headers=headers, timeout=5)
-        await update.message.reply_text(f"Status: {resp.status_code}\nBoyut: {len(resp.text)} karakter\nİlk 300 karakter:\n{resp.text[:300]}")
-    except requests.exceptions.Timeout:
-        await update.message.reply_text("❌ Timeout — fintables erişim engelli.")
+        resp = requests.get(url, headers=headers, timeout=20)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        tables = soup.find_all("table")
+        msg = f"Status: {resp.status_code}\nToplam {len(tables)} tablo\n\n"
+        for i, table in enumerate(tables[:4]):
+            rows = table.find_all("tr")
+            msg += f"--- Tablo {i+1} ---\n"
+            for row in rows[:6]:
+                cells = [td.get_text(strip=True) for td in row.find_all(["td","th"])]
+                if cells:
+                    msg += " | ".join(cells) + "\n"
+            msg += "\n"
+        await update.message.reply_text(msg[:3000])
     except Exception as e:
-        await update.message.reply_text(f"Hata: {type(e).__name__}: {e}")
+        await update.message.reply_text(f"Hata: {e}")
 
 
 def main():
