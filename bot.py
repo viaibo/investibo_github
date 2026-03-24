@@ -172,29 +172,30 @@ async def cmd_test(update, context: ContextTypes.DEFAULT_TYPE):
     import requests
     fund_code = context.args[0].upper() if context.args else "TLY"
 
-    # Deneme 1: fonara SSL bypass
+    # Deneme 1: mynet farklı URL
     try:
-        url = f"https://www.fonara.com/api/funds/{fund_code}"
-        resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}, verify=False)
-        await update.message.reply_text(f"fonara\nStatus: {resp.status_code}\n{resp.text[:800]}")
-    except Exception as e:
-        await update.message.reply_text(f"fonara hata: {e}")
-
-    # Deneme 2: fon.com.tr SSL bypass
-    try:
-        url = f"https://www.fon.com.tr/fon/{fund_code}"
-        resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}, verify=False)
-        await update.message.reply_text(f"fon.com.tr\nStatus: {resp.status_code}\n{resp.text[:800]}")
-    except Exception as e:
-        await update.message.reply_text(f"fon.com.tr hata: {e}")
-
-    # Deneme 3: finans.mynet.com
-    try:
-        url = f"https://finans.mynet.com/fon/detay/{fund_code}/"
+        url = f"https://finans.mynet.com/fon/detay/{fund_code.lower()}/"
         resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        await update.message.reply_text(f"mynet finans\nStatus: {resp.status_code}\n{resp.text[:800]}")
+        # fiyat içeriyor mu?
+        if "fiyat" in resp.text.lower() or "price" in resp.text.lower():
+            idx = resp.text.lower().find("fiyat")
+            await update.message.reply_text(f"mynet ✅\nStatus: {resp.status_code}\n...{resp.text[max(0,idx-50):idx+200]}...")
+        else:
+            await update.message.reply_text(f"mynet - fiyat bulunamadı\nStatus: {resp.status_code}\nURL: {resp.url}")
     except Exception as e:
         await update.message.reply_text(f"mynet hata: {e}")
+
+    # Deneme 2: doviz.com
+    try:
+        url = f"https://www.doviz.com/yatirim-fonlari/{fund_code}"
+        resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+        if "fiyat" in resp.text.lower() or fund_code in resp.text:
+            idx = max(resp.text.lower().find("fiyat"), 0)
+            await update.message.reply_text(f"doviz.com ✅\nStatus: {resp.status_code}\n...{resp.text[idx:idx+300]}...")
+        else:
+            await update.message.reply_text(f"doviz.com - veri yok\nStatus: {resp.status_code}\nURL: {resp.url}")
+    except Exception as e:
+        await update.message.reply_text(f"doviz.com hata: {e}")
 
 
 def main():
